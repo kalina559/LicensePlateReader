@@ -2,14 +2,60 @@
 #include <iostream>
 #include <opencv2/opencv.hpp>
 #include <opencv2/highgui/highgui.hpp>
+#include <string>
+#define templateString "ABCDEFGHIJKLMNOPRSTUVWXYZ0123456789"
 
 class ImgProcHelper
 {
 public:
+	static std::string readLicensePlate(std::string path, cv::Mat& grayTemplateImage)
+	{
+		cv::Mat inputImg, gray;
+		std::vector<std::vector<cv::Point> > contours;
+
+		inputImg = cv::imread(path);
+		cvtColor(inputImg, gray, cv::COLOR_BGR2GRAY);
+
+		getContoursFromGrayScale(gray, contours, plate);
+		cv::Mat plateImg(inputImg.size(), CV_64FC3, cv::Scalar(0, 0, 0));
+
+		/*int plateContourIndex = 0;
+		if (isPlateVisible(plateContourIndex, contours))
+		{
+			cutPlateFromImg(plateContourIndex, contours, gray, plateImg);
+
+			return getLettersFromPlate(grayTemplateImage, plateImg);
+		}
+		else
+		{
+			return "No license plate was found in the image";
+		}*/
+
+		std::vector<int> possiblePlates = getPossiblePlates(contours);
+
+		while (!possiblePlates.empty())
+		{
+			cutPlateFromImg(possiblePlates.back(), contours, gray, plateImg);
+			if (getLettersFromPlate(grayTemplateImage, plateImg).length() == 7)
+			{
+				cv::Mat helper = cv::imread("C:/Users/Kalin/Desktop/wma_materialy/tab2.jpg");
+				cv::Mat img_kontury1(helper.size(), CV_64FC3, cv::Scalar(0, 0, 0));
+				cv::drawContours(img_kontury1, contours, -1, cv::Scalar(0, 255, 0), 1);
+
+				cv::imshow("kontury", img_kontury1);
+				cv::waitKey(0);
+				return getLettersFromPlate(grayTemplateImage, plateImg);
+			}
+			else
+			{
+				cv::Mat plateImg(inputImg.size(), CV_64FC3, cv::Scalar(0, 0, 0));
+				possiblePlates.pop_back();
+			}
+		}
+	}
+
 	static bool isPlateVisible(int& plateContourIndex, std::vector<std::vector<cv::Point>> contours)
 	{
-		cv::Mat cutImg(cv::Scalar(0, 0, 0));
-		int plate_search = 0;
 		for (size_t i = 0; i < contours.size(); i++)
 		{
 			if (cv::arcLength(contours[i], true) > 100 && cv::contourArea(contours[i]) > 1500)
@@ -17,11 +63,7 @@ public:
 				float width = cv::boundingRect(contours[i]).width;
 				float height = cv::boundingRect(contours[i]).height;
 				if (width / height > 3 && width / height < 5)
-				{        // wyszukiwanie konturu o wymiarach tablicy
-					//cv::drawContours(contoursImg, contours, i, cv::Scalar(0, 255, 0), 1);
-					//cutImg = gray(boundingRect(contours[i]));
-					//tablica_area = width * height;
-					//plate_search = 1;
+				{        
 					plateContourIndex = i;
 					return true;
 				}
@@ -30,19 +72,24 @@ public:
 		return false;
 	}
 
-	static void cutPlateFromImg(int plateContourIndex, std::vector<std::vector<cv::Point>> contours, cv::Mat grayImg, cv::Mat& cutImg)
+	static std::vector<int> getPossiblePlates(std::vector<std::vector<cv::Point>> contours)
 	{
-		cutImg = grayImg(cv::boundingRect(contours[plateContourIndex]));
-	}
-
-	static int getImgArea(cv::Mat img)
-	{
-		return img.cols * img.rows;
+		std::vector<int> possiblePlatesIndexes;
+		for (size_t i = 0; i < contours.size(); i++)
+		{
+			float width = cv::boundingRect(contours[i]).width;
+			float height = cv::boundingRect(contours[i]).height;
+			if (width / height > 3 && width / height < 5)
+			{
+				possiblePlatesIndexes.push_back(i);
+			}
+		}
+		return possiblePlatesIndexes;
 	}
 
 	static void sortContours(std::vector<std::vector<cv::Point>>& contours)
 	{
-		for (int i = 0; i < contours.size(); i++)           //sortowanie konturow znakow od lewej do prawej
+		for (int i = 0; i < contours.size(); i++)           //sort the contours from right to left
 		{
 			for (int j = 1; j < contours.size() - i; j++)
 			{
@@ -57,5 +104,134 @@ public:
 	static bool isContourOutsidePreviousOne(std::vector<cv::Point> currentContour, std::vector<cv::Point> previousContour)
 	{
 		return (boundingRect(currentContour).x > boundingRect(previousContour).x + boundingRect(previousContour).width);
+	}
+
+	enum expectedContour
+	{
+		plate, character
+	};
+	static void getContoursFromGrayScale(cv::Mat& inputImg, std::vector<std::vector<cv::Point> >& contours, expectedContour expContour)
+	{
+		
+		cv::Mat threshImg(cv::Scalar(0, 0, 0));
+		threshold(inputImg, threshImg, 110, 255, cv::THRESH_BINARY_INV);
+
+		cv::Mat morphedImg(cv::Scalar(0, 0, 0));
+		int kernelSize;
+		if (expContour == plate)
+		{
+			kernelSize = 4;
+		}
+		else
+		{
+			kernelSize = 2;
+		}
+		//cv::Size kernelSize(3, 3);
+		cv::Mat kernel = getStructuringElement(cv::MORPH_RECT, cv::Size(kernelSize, kernelSize));
+		morphologyEx(threshImg, morphedImg, cv::MORPH_CLOSE, kernel);
+
+		cv::Mat contoursImg(inputImg.size(), CV_64FC3, cv::Scalar(0, 0, 0));
+
+		cv::Mat cannyOutputImg(cv::Scalar(0, 0, 0));
+
+		Canny(morphedImg, cannyOutputImg, 60, 60 * 3);
+		findContours(cannyOutputImg, contours, cv::RETR_TREE, cv::CHAIN_APPROX_SIMPLE);
+	}	
+
+	static std::string getLettersFromPlate(cv::Mat& grayTemplateImg, cv::Mat& plateImg)
+	{
+		std::vector<std::vector<cv::Point>> contours;
+		getContoursFromGrayScale(plateImg, contours, character);
+		sortContours(contours);		
+
+		cv::Mat checkedCharacter;
+		std::string licensePlate = "", letter;
+
+		std::vector<cv::Point> previousContour;
+
+		for (size_t i = 0; i < contours.size(); i++)
+		{
+			float width = boundingRect(contours[i]).width;
+			float height = boundingRect(contours[i]).height;
+			if (isContourACharacter(width, height, plateImg, contours[i], previousContour))
+			{
+				previousContour = contours[i];
+
+				checkedCharacter = plateImg(boundingRect(contours[i]));        // cutting a character out of the plate image
+				while (checkedCharacter.rows > 28)  //the row with biggest character size is approximately this height
+				{					
+					pyrDown(checkedCharacter, checkedCharacter);
+				}
+				letter = findCorrespondingLetter(findMatchingCharacterCoordinateX(grayTemplateImg, checkedCharacter), contours[i]);
+				licensePlate = licensePlate + letter;
+			}
+		}
+
+		return licensePlate;
+	}
+
+	static char findCorrespondingLetter(int x,  std::vector<cv::Point> contour)
+	{               
+		int k = 0;
+		while (!(x >= 1 + k * 33 && x <= 27 + k * 33))
+		{
+			++k;
+		}
+		if (templateString[k] == '0') // U and 0 are often mixed up, so the ratio of contour area to boundingRect area is checked to determine which one is it
+		{
+			if ((contourArea(contour)) / (boundingRect(contour).width * boundingRect(contour).height) < 0.6)
+			{
+				return 'U';
+			}
+			else
+			{
+				cv::Point2f center;
+				float radius;
+				cv::minEnclosingCircle(contour, center, radius);
+				std::cout << "ratio 0 " << ((cv::arcLength(contour, true) * cv::arcLength(contour, true)) / (2 * 3.14 * cv::contourArea(contour))) << std::endl;
+				//if ((cv::arcLength(contour, true) / (2 * 3.14 * radius)) > 0.91)
+				//{
+				//	//moze cos sprobowac z houghCircles?
+				//	return 'O';
+				//}				
+			}
+		}
+
+		if (templateString[k] == 'O') // U and 0 are often mixed up, so the ratio of contour area to boundingRect area is checked to determine which one is it
+		{				
+				std::cout << "ratio O " << ((cv::arcLength(contour, true) * cv::arcLength(contour, true)) / (2 * 3.14 * cv::contourArea(contour))) << std::endl;
+				
+			
+		}
+		
+		return templateString[k];
+	}
+
+	static int findMatchingCharacterCoordinateX(cv::Mat& grayTemplateImage, cv::Mat& checkedCharacter)
+	{
+		double minValue, maxValue;
+		cv::Point minLocation, maxLocation, matchLocation;
+
+		cv::Mat resultMap;
+		matchTemplate(grayTemplateImage, checkedCharacter, resultMap, cv::TM_SQDIFF_NORMED);
+		minMaxLoc(resultMap, &minValue, &maxValue, &minLocation, &maxLocation, cv::Mat());
+		matchLocation = minLocation;
+
+		return matchLocation.x;
+	}
+
+	static bool isContourACharacter(float width, float height, cv::Mat& cutImg, std::vector<cv::Point>& currentContour, std::vector<cv::Point>& previousContour)
+	{
+		return (width / height > 0.3 && width / height < 0.75 && double(width * height) > 0.015 * getImgArea(cutImg) && isContourOutsidePreviousOne(currentContour, previousContour));
+	}
+
+	static void cutPlateFromImg(int plateContourIndex, std::vector<std::vector<cv::Point>> contours, cv::Mat grayImg, cv::Mat& cutImg)
+	{
+		cutImg = grayImg(cv::boundingRect(contours[plateContourIndex]));
+	}
+
+	static int getImgArea(cv::Mat img)
+	{
+		return img.cols * img.rows;
 	}
 };
