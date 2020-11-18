@@ -19,18 +19,6 @@ public:
 		getContoursFromGrayScale(gray, contours, plate);
 		cv::Mat plateImg(inputImg.size(), CV_64FC3, cv::Scalar(0, 0, 0));
 
-		/*int plateContourIndex = 0;
-		if (isPlateVisible(plateContourIndex, contours))
-		{
-			cutPlateFromImg(plateContourIndex, contours, gray, plateImg);
-
-			return getLettersFromPlate(grayTemplateImage, plateImg);
-		}
-		else
-		{
-			return "No license plate was found in the image";
-		}*/
-
 		std::vector<int> possiblePlates = getPossiblePlates(contours);
 
 		while (!possiblePlates.empty())
@@ -38,12 +26,6 @@ public:
 			cutPlateFromImg(possiblePlates.back(), contours, gray, plateImg);
 			if (getLettersFromPlate(grayTemplateImage, plateImg).length() == 7)
 			{
-				cv::Mat helper = cv::imread("C:/Users/Kalin/Desktop/wma_materialy/tab2.jpg");
-				cv::Mat img_kontury1(helper.size(), CV_64FC3, cv::Scalar(0, 0, 0));
-				cv::drawContours(img_kontury1, contours, -1, cv::Scalar(0, 255, 0), 1);
-
-				cv::imshow("kontury", img_kontury1);
-				cv::waitKey(0);
 				return getLettersFromPlate(grayTemplateImage, plateImg);
 			}
 			else
@@ -52,6 +34,8 @@ public:
 				possiblePlates.pop_back();
 			}
 		}
+
+		return "No license plate was found in the image";
 	}
 
 	static bool isPlateVisible(int& plateContourIndex, std::vector<std::vector<cv::Point>> contours)
@@ -126,7 +110,6 @@ public:
 		{
 			kernelSize = 2;
 		}
-		//cv::Size kernelSize(3, 3);
 		cv::Mat kernel = getStructuringElement(cv::MORPH_RECT, cv::Size(kernelSize, kernelSize));
 		morphologyEx(threshImg, morphedImg, cv::MORPH_CLOSE, kernel);
 
@@ -135,7 +118,15 @@ public:
 		cv::Mat cannyOutputImg(cv::Scalar(0, 0, 0));
 
 		Canny(morphedImg, cannyOutputImg, 60, 60 * 3);
-		findContours(cannyOutputImg, contours, cv::RETR_TREE, cv::CHAIN_APPROX_SIMPLE);
+		if (expContour == plate)
+		{
+			findContours(cannyOutputImg, contours, cv::RETR_TREE, cv::CHAIN_APPROX_SIMPLE);
+		}
+		else
+		{
+			findContours(cannyOutputImg, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE);
+		}
+		
 	}	
 
 	static std::string getLettersFromPlate(cv::Mat& grayTemplateImg, cv::Mat& plateImg)
@@ -177,33 +168,20 @@ public:
 		{
 			++k;
 		}
-		if (templateString[k] == '0') // U and 0 are often mixed up, so the ratio of contour area to boundingRect area is checked to determine which one is it
+		if (templateString[k] == '0' || templateString[k] == 'O' || templateString[k] == 'U') // U and 0 are often mixed up, so the ratio of contour area to boundingRect area is checked to determine which one is it
 		{
-			if ((contourArea(contour)) / (boundingRect(contour).width * boundingRect(contour).height) < 0.6)
+			double circularity = 4 * 3.14 * cv::contourArea(contour) / (cv::arcLength(contour, true) * cv::arcLength(contour, true));     // for a perfect circle it circularity = 1, the less the contour resembles a circle, the lower the value
+			//std::cout << "initial char: " << templateString[k] << " ratio: " << circularity << std::endl;
+			if (circularity < 0.8)
 			{
-				return 'U';
+				if (circularity < 0.4)
+				{
+					return 'U';
+				}
+				return '0';
 			}
-			else
-			{
-				cv::Point2f center;
-				float radius;
-				cv::minEnclosingCircle(contour, center, radius);
-				std::cout << "ratio 0 " << ((cv::arcLength(contour, true) * cv::arcLength(contour, true)) / (2 * 3.14 * cv::contourArea(contour))) << std::endl;
-				//if ((cv::arcLength(contour, true) / (2 * 3.14 * radius)) > 0.91)
-				//{
-				//	//moze cos sprobowac z houghCircles?
-				//	return 'O';
-				//}				
-			}
-		}
-
-		if (templateString[k] == 'O') // U and 0 are often mixed up, so the ratio of contour area to boundingRect area is checked to determine which one is it
-		{				
-				std::cout << "ratio O " << ((cv::arcLength(contour, true) * cv::arcLength(contour, true)) / (2 * 3.14 * cv::contourArea(contour))) << std::endl;
-				
-			
-		}
-		
+			return 'O';
+		}		
 		return templateString[k];
 	}
 

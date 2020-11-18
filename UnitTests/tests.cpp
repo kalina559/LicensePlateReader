@@ -2,20 +2,24 @@
 #include "libs/catch/catch.hpp"
 #include"licensePlateReader/LicensePlateReader/ImgProcHelper.h"
 #include<iostream>
+#include<experimental/filesystem>
 
 TEST_CASE("Still license plates images")
 {
 	cv::Mat templateImg, grayTemplateImage;
 
-	templateImg = cv::imread("C:/Users/Kalin/Desktop/wma_materialy//wzory_dobre.png");
-	cv::cvtColor(templateImg, grayTemplateImage, cv::COLOR_BGR2GRAY);
+	std::string projectPath = std::experimental::filesystem::current_path().u8string();
 
-	REQUIRE(ImgProcHelper::readLicensePlate("C:/Users/Kalin/Desktop/wma_materialy/tab1.jpg", grayTemplateImage) == "WE984KV");
-	REQUIRE(ImgProcHelper::readLicensePlate("C:/Users/Kalin/Desktop/wma_materialy/tab2.jpg", grayTemplateImage) == "SB8903R");
-	REQUIRE(ImgProcHelper::readLicensePlate("C:/Users/Kalin/Desktop/wma_materialy/tab3.jpg", grayTemplateImage) == "HPHYO35");
-	REQUIRE(ImgProcHelper::readLicensePlate("C:/Users/Kalin/Desktop/wma_materialy/tab4.jpg", grayTemplateImage) == "PZ596LT");
-	REQUIRE(ImgProcHelper::readLicensePlate("C:/Users/Kalin/Desktop/wma_materialy/tab5.jpg", grayTemplateImage) == "P0BUDKA");
-	REQUIRE(ImgProcHelper::readLicensePlate("C:/Users/Kalin/Desktop/wma_materialy/tab6.jpg", grayTemplateImage) == "BL19957");
-	REQUIRE(ImgProcHelper::readLicensePlate("C:/Users/Kalin/Desktop/wma_materialy/tab7.jpg", grayTemplateImage) == "EL929P0");
-	REQUIRE(ImgProcHelper::readLicensePlate("C:/Users/Kalin/Desktop/wma_materialy/tab8.jpg", grayTemplateImage) == "PO48788");
+	templateImg = cv::imread(projectPath + "/images/templateCharacters.jpg");
+	cv::cvtColor(templateImg, grayTemplateImage, cv::COLOR_BGR2GRAY);
+	
+	REQUIRE(ImgProcHelper::readLicensePlate(projectPath + "/images/license1.jpg", grayTemplateImage) == "WE984KV");
+	REQUIRE(ImgProcHelper::readLicensePlate(projectPath + "/images/license2.jpg", grayTemplateImage) == "SB8903R");
+	REQUIRE(ImgProcHelper::readLicensePlate(projectPath + "/images/license3.jpg", grayTemplateImage) == "HPHY035");
+	REQUIRE(ImgProcHelper::readLicensePlate(projectPath + "/images/license4.jpg", grayTemplateImage) == "PZ596LT");
+	REQUIRE(ImgProcHelper::readLicensePlate(projectPath + "/images/license5.jpg", grayTemplateImage) == "POBUDKA");
+	REQUIRE(ImgProcHelper::readLicensePlate(projectPath + "/images/license6.jpg", grayTemplateImage) == "BL19957");
+	REQUIRE(ImgProcHelper::readLicensePlate(projectPath + "/images/license7.jpg", grayTemplateImage) == "EL929P0");
+	REQUIRE(ImgProcHelper::readLicensePlate(projectPath + "/images/license8.jpg", grayTemplateImage) == "PO48788");
+	REQUIRE(ImgProcHelper::readLicensePlate(projectPath + "/images/forest.jpg", grayTemplateImage) == "No license plate was found in the image");
 }
