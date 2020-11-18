@@ -1,3 +1,9 @@
-C++ app reading license plates.
-
-To build the project, opencv_world411.dll and opencv_world411d.dll have to be placed in both LicensePlateReader folder nad UnitTests folder.
+# Readme.md
+##Headers (Underline)
+C++ app reading license plates. (Underline)
+=============
+Progress (Underline)
+-------------
+- Currently the app reads plates from images where the plate is clearly visible, and oriented perpendiculatrly 
+to camera axis.
+- Unit tests are implemented for the aforementioned case
